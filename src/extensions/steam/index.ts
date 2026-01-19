@@ -92,9 +92,19 @@ export default class SteamExtension extends BaseExtension {
   }
 
   async sendUserAlert(user: User) {
-    const member =
-      this.alertChannel?.guild.members.cache.get(user.discordUserId) ??
-      (await this.alertChannel?.guild.members.fetch(user.discordUserId));
+    // Сначала проверяем кэш, затем загружаем конкретного пользователя
+    // Это безопаснее чем загружать всех участников
+    let member = this.alertChannel?.guild.members.cache.get(user.discordUserId);
+    
+    if (!member && this.alertChannel?.guild) {
+      try {
+        member = await this.alertChannel.guild.members.fetch(user.discordUserId);
+      } catch (error) {
+        // Игнорируем ошибки загрузки конкретного пользователя
+        console.warn(`Failed to fetch member ${user.discordUserId}:`, error);
+        return;
+      }
+    }
 
     if (!member || member.voice.channel) {
       return;
