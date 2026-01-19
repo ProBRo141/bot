@@ -46,5 +46,8 @@ export default {
     roleMessageCommandName: "сообщение_ролей",
     roleMessageCommandDescription: "Создать сообщение ролей и категорий",
     roleMessageCommandReply: "Сообщение создано",
+    refreshCommandName: "обновить",
+    refreshCommandDescription: "Обновить сообщения с ролями вручную",
+    refreshCommandReply: "Сообщения обновлены",
   },
 } as const;

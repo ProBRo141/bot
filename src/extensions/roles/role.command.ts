@@ -80,7 +80,7 @@ export default class RoleCommand extends BaseSlashCommand<RolesExtension> {
       components: createCategoriesSelectMenu(
         categories,
         selectCategorySelectMenuCustomId
-      ) as any,
+      ),
     });
   }
 

@@ -65,7 +65,7 @@ export default class CategoryCommand extends BaseSlashCommand<RolesExtension> {
       components: createCategoriesSelectMenu(
         categories,
         removeCategorySelectMenuCustomId
-      ) as any,
+      ),
     });
   }
 }
