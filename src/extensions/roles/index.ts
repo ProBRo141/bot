@@ -101,46 +101,86 @@ export default class RolesExtension extends BaseExtension {
   }
 
   async updateRoleMessage(roleMessage: RoleMessage, content: string) {
-    const channel = this.client.channels.cache.get(roleMessage.channelId) as
-      | TextChannel
-      | undefined;
+    try {
+      const channel = this.client.channels.cache.get(roleMessage.channelId) as
+        | TextChannel
+        | undefined;
 
-    if (!channel) {
-      return;
+      if (!channel) {
+        console.warn(
+          `Channel ${roleMessage.channelId} not found for message ${roleMessage.messageId}`
+        );
+        return;
+      }
+
+      await channel.messages.edit(roleMessage.messageId, { content });
+    } catch (error: any) {
+      // Если сообщение не найдено, удаляем его из базы
+      if (error?.code === 10008) {
+        console.warn(
+          `Message ${roleMessage.messageId} not found, removing from database`
+        );
+        await prisma.roleMessage.delete({
+          where: { messageId: roleMessage.messageId },
+        });
+      } else {
+        throw error;
+      }
     }
-
-    await channel.messages.edit(roleMessage.messageId, { content });
   }
 
   async updateRoleMessages(guild: Guild) {
-    const roleCategories = await prisma.roleCategory.findMany({
-      where: { roles: { every: { guildId: guild.id } } },
-      include: { roles: true },
-    });
+    try {
+      // Получаем все категории с ролями
+      const roleCategories = await prisma.roleCategory.findMany({
+        include: { roles: true },
+      });
 
-    if (!roleCategories.length) {
-      return;
+      // Фильтруем категории, оставляя только те, где есть роли этого гилда
+      const guildRoleCategories = roleCategories
+        .map((category) => ({
+          ...category,
+          roles: category.roles.filter((role) => role.guildId === guild.id),
+        }))
+        .filter((category) => category.roles.length > 0);
+
+      if (!guildRoleCategories.length) {
+        return;
+      }
+
+      const roleMessages = await prisma.roleMessage.findMany({
+        where: { guildId: guild.id },
+      });
+
+      if (!roleMessages || roleMessages.length === 0) {
+        return;
+      }
+
+      const fmtGenerator = await createRegisteredRolesFmtGenerator(guild);
+
+      const roleCategoriesFmt = Array.from(
+        formatRoleCategories(guildRoleCategories, fmtGenerator)
+      ).join("\n\n");
+
+      // Обрабатываем результаты обновления для логирования ошибок
+      const results = await Promise.allSettled(
+        roleMessages.map((roleMessage) =>
+          this.updateRoleMessage(roleMessage, roleCategoriesFmt)
+        )
+      );
+
+      // Логируем ошибки если есть
+      results.forEach((result, index) => {
+        if (result.status === "rejected") {
+          console.error(
+            `Failed to update role message ${roleMessages[index].messageId}:`,
+            result.reason
+          );
+        }
+      });
+    } catch (error) {
+      console.error(`Error updating role messages for guild ${guild.id}:`, error);
     }
-
-    const roleMessages = await prisma.roleMessage.findMany({
-      where: { guildId: guild.id },
-    });
-
-    if (!roleMessages) {
-      return;
-    }
-
-    const fmtGenerator = await createRegisteredRolesFmtGenerator(guild);
-
-    const roleCategoriesFmt = Array.from(
-      formatRoleCategories(roleCategories, fmtGenerator)
-    ).join("\n\n");
-
-    Promise.allSettled(
-      roleMessages.map((roleMessage) =>
-        this.updateRoleMessage(roleMessage, roleCategoriesFmt)
-      )
-    );
   }
 
   @eventHandler({ event: "messageDelete" })
