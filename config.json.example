@@ -1,0 +1,8 @@
+{
+  "botToken": "YOUR_BOT_TOKEN_HERE",
+  "alertChannelId": "YOUR_CHANNEL_ID",
+  "alertRoleIds": ["ROLE_ID_1", "ROLE_ID_2"],
+  "rconHost": "YOUR_RCON_HOST",
+  "rconPort": 36101,
+  "rconPassword": "YOUR_RCON_PASSWORD"
+}

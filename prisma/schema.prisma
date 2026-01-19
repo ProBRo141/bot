@@ -1,0 +1,35 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  discordUserId String @id @unique
+  steamId64     String @unique
+}
+
+model RoleCategory {
+  id    Int              @id @unique @default(autoincrement())
+  title String
+  roles RegisteredRole[]
+}
+
+model RegisteredRole {
+  guildId        String
+  roleId         String       @id @unique
+  category       RoleCategory @relation(fields: [roleCategoryId], references: [id], onDelete: Cascade)
+  roleCategoryId Int
+}
+
+model RoleMessage {
+  guildId   String
+  channelId String
+  messageId String @id @unique
+}
