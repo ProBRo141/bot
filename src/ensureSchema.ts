@@ -12,12 +12,38 @@ const root = path.resolve(__dirname, "..");
 const schemaPath = path.join(root, "prisma", "schema.prisma");
 const schemaDir = path.dirname(schemaPath);
 
-function requireDatabaseUrl(): void {
+/** Подмешивает .env из корня и prisma/ (не перезаписывает уже заданные переменные панели). */
+function mergeEnvFromDotenvFiles(): void {
+  for (const envPath of [path.join(root, ".env"), path.join(schemaDir, ".env")]) {
+    if (!fs.existsSync(envPath)) continue;
+    const content = fs.readFileSync(envPath, "utf8").replace(/^\uFEFF/, "");
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq <= 0) continue;
+      const key = trimmed.slice(0, eq).trim();
+      let val = trimmed.slice(eq + 1).trim();
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        val = val.slice(1, -1);
+      }
+      if (process.env[key] === undefined || process.env[key] === "") {
+        process.env[key] = val;
+      }
+    }
+  }
+}
+
+/** SQLite в этом проекте — если нигде не задан URL, подставляем путь как в типовом prisma/.env. */
+function ensureDatabaseUrl(): void {
   if (!process.env.DATABASE_URL?.trim()) {
-    console.error(
-      "[ensureSchema] В окружении нет DATABASE_URL. Задайте в Pterodactyl, например: file:./database.sqlite3"
+    process.env.DATABASE_URL = "file:./database.sqlite3";
+    console.log(
+      "[ensureSchema] DATABASE_URL не задан (ни в env панели, ни в .env) — использую file:./database.sqlite3 → файл в prisma/"
     );
-    process.exit(1);
   }
 }
 
@@ -29,7 +55,6 @@ function normalizeSqliteDatabaseUrl(): void {
   }
 
   let filePath = url.slice("file:".length).trim();
-  // file:///absolute (редко в контейнере)
   if (filePath.startsWith("//") && filePath.length > 2) {
     filePath = filePath.replace(/^\/+/, "/");
   }
@@ -72,7 +97,8 @@ if (process.env.SKIP_PRISMA_SCHEMA_SYNC === "1") {
     process.exit(1);
   }
 
-  requireDatabaseUrl();
+  mergeEnvFromDotenvFiles();
+  ensureDatabaseUrl();
   normalizeSqliteDatabaseUrl();
 
   const pushArgs = ["db", "push", "--skip-generate", "--schema", schemaPath];

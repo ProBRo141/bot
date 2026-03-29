@@ -56,7 +56,7 @@ export default class RoleCommand extends BaseSlashCommand<RolesExtension> {
   }: CommandContext<
     CommandInteraction,
     {
-      [phrases.roles.roleCommandName]: Role;
+      [phrases.roles.roleOptionName]: Role;
     }
   >) {
     const categories = await prisma.roleCategory.findMany();
@@ -76,11 +76,12 @@ export default class RoleCommand extends BaseSlashCommand<RolesExtension> {
 
     stateCtx.data = { roleId: role.id };
 
+    const rows = createCategoriesSelectMenu(
+      categories,
+      selectCategorySelectMenuCustomId
+    );
     await interaction.editReply({
-      components: createCategoriesSelectMenu(
-        categories,
-        selectCategorySelectMenuCustomId
-      ),
+      components: rows.map((row) => row.toJSON()),
     });
   }
 

@@ -123,7 +123,6 @@ export const createCategoriesSelectMenu = (
 
 export default class RolesExtension extends BaseExtension {
   private updateDebounceMap = new Map<string, NodeJS.Timeout>();
-  /** Цепочка обновлений по гильдии — без гонок «полный текст / урезанный текст». */
   private roleMessageUpdateChains = new Map<
     string,
     Promise<RoleMessageUpdateResult>
@@ -132,15 +131,13 @@ export default class RolesExtension extends BaseExtension {
   async register(): Promise<void> {
     await super.register();
 
-    // Уменьшен интервал обновления с 60 до 30 секунд для более быстрого обновления
     setInterval(() => {
       void Promise.allSettled(
         this.client.guilds.cache.map((guild) => this.updateRoleMessages(guild))
       );
-    }, 30 * 1000); // 30 секунд вместо 60
+    }, 30 * 1000);
   }
 
-  // Debounce для предотвращения множественных обновлений
   private debouncedUpdate(guildId: string, callback: () => void, delay = 2000) {
     const existing = this.updateDebounceMap.get(guildId);
     if (existing) {
@@ -229,13 +226,11 @@ export default class RolesExtension extends BaseExtension {
     await prisma.roleMessage.deleteMany({ where: { messageId: message.id } });
   }
 
-  // Мгновенное обновление при изменении ролей пользователя
   @eventHandler({ event: "guildMemberUpdate" })
   async guildMemberUpdateHandler(
     oldMember: GuildMember,
     newMember: GuildMember
   ) {
-    // Проверяем, изменились ли роли
     if (oldMember.roles.cache.size === newMember.roles.cache.size) {
       const rolesChanged = !oldMember.roles.cache.equals(
         newMember.roles.cache
@@ -245,7 +240,6 @@ export default class RolesExtension extends BaseExtension {
       }
     }
 
-    // Проверяем, есть ли зарегистрированные роли в этом гилде
     const registeredRoles = await prisma.registeredRole.findMany({
       where: { guildId: newMember.guild.id },
     });
@@ -254,7 +248,6 @@ export default class RolesExtension extends BaseExtension {
       return;
     }
 
-    // Проверяем, затронута ли одна из отслеживаемых ролей
     const trackedRoleIds = registeredRoles.map((r) => r.roleId);
     const oldRoleIds = Array.from(oldMember.roles.cache.keys());
     const newRoleIds = Array.from(newMember.roles.cache.keys());
@@ -268,7 +261,6 @@ export default class RolesExtension extends BaseExtension {
       return;
     }
 
-    // Обновляем сообщения с задержкой (debounce) для предотвращения спама
     this.debouncedUpdate(newMember.guild.id, () => {
       this.updateRoleMessages(newMember.guild).catch((error) => {
         console.error(

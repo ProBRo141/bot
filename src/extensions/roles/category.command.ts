@@ -61,11 +61,12 @@ export default class CategoryCommand extends BaseSlashCommand<RolesExtension> {
   async runRemove({ interaction }: CommandContext) {
     const categories = await prisma.roleCategory.findMany();
 
+    const rows = createCategoriesSelectMenu(
+      categories,
+      removeCategorySelectMenuCustomId
+    );
     await interaction.editReply({
-      components: createCategoriesSelectMenu(
-        categories,
-        removeCategorySelectMenuCustomId
-      ),
+      components: rows.map((row) => row.toJSON()),
     });
   }
 }

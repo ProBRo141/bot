@@ -3,16 +3,20 @@
   "version": "2.0.0",
   "description": "Base template for all of my kwork discord bots",
   "main": "bin/index.js",
-  "repository": "https://github.com/TrixiS/base-ts-bot.git",
+  "repository": "https://github.com/ProBRo141/bot.git",
   "author": "TrixiS",
   "license": "MIT",
+  "prisma": {
+    "schema": "prisma/schema.prisma"
+  },
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
   },
   "scripts": {
-    "setup": "prisma db push --skip-generate && prisma generate && tsc",
-    "build": "prisma db push --skip-generate && prisma generate && tsc",
+    "setup": "prisma db push --skip-generate --schema prisma/schema.prisma && prisma generate --schema prisma/schema.prisma && node scripts/compile-if-src.cjs",
+    "build": "prisma db push --skip-generate --schema prisma/schema.prisma && prisma generate --schema prisma/schema.prisma && node scripts/compile-if-src.cjs",
+    "compile": "tsc",
     "start": "node bin/index.js",
     "cli": "pnpm ts-node cli.ts"
   },
