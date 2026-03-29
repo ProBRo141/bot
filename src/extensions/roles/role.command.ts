@@ -81,7 +81,7 @@ export default class RoleCommand extends BaseSlashCommand<RolesExtension> {
       selectCategorySelectMenuCustomId
     );
     await interaction.editReply({
-      components: rows.map((row) => row.toJSON()),
+      components: rows as never,
     });
   }
 

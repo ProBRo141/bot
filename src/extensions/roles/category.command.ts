@@ -66,7 +66,8 @@ export default class CategoryCommand extends BaseSlashCommand<RolesExtension> {
       removeCategorySelectMenuCustomId
     );
     await interaction.editReply({
-      components: rows.map((row) => row.toJSON()),
+      // Builders / toJSON() расходятся с типами d.js 14.10 для editReply — на рантайме корректны билдеры
+      components: rows as never,
     });
   }
 }

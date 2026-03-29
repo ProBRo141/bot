@@ -31,11 +31,35 @@ export const getExistingConfigFilepaths = () =>
 const parseExistingConfig = () => {
   const existingConfigFilepath = getExistingConfigFilepaths()[0];
 
-  if (!existingConfigFilepath) {
-    throw new Error("Config not found");
+  if (existingConfigFilepath) {
+    return configModel.parseFile(existingConfigFilepath, { encoding: "utf-8" });
   }
 
-  return configModel.parseFile(existingConfigFilepath, { encoding: "utf-8" });
+  const botToken =
+    process.env.BOT_TOKEN?.trim() ||
+    process.env.DISCORD_BOT_TOKEN?.trim() ||
+    "";
+
+  if (botToken) {
+    const alertRoleIdsRaw = process.env.ALERT_ROLE_IDS?.trim();
+    const alertRoleIds = alertRoleIdsRaw
+      ? alertRoleIdsRaw.split(/[,;\s]+/).filter(Boolean)
+      : [];
+    const rconPortParsed = parseInt(process.env.RCON_PORT ?? "", 10);
+
+    return configModel.parse({
+      botToken,
+      alertChannelId: process.env.ALERT_CHANNEL_ID?.trim() ?? "",
+      alertRoleIds,
+      rconHost: process.env.RCON_HOST?.trim() ?? "",
+      rconPort: Number.isFinite(rconPortParsed) ? rconPortParsed : 28017,
+      rconPassword: process.env.RCON_PASSWORD?.trim() ?? "",
+    });
+  }
+
+  throw new Error(
+    "Config not found: добавьте config.json (см. config.json.example) или задайте BOT_TOKEN в переменных окружения панели."
+  );
 };
 
 export const config = parseExistingConfig();
