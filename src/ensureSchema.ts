@@ -1,21 +1,79 @@
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
+import { createRequire } from "node:module";
 import * as path from "node:path";
 
 /**
  * Синхронизирует SQLite-схему до импорта PrismaClient.
- * Для Pterodactyl: в поле запуска достаточно `node bin/index.js` — отдельный `prisma db push` не нужен.
+ * Нормализует DATABASE_URL в абсолютный путь (относительные file: — от каталога prisma/,
+ * как в документации Prisma), иначе `db push` и PrismaClient часто попадают в разные файлы.
  */
 const root = path.resolve(__dirname, "..");
 const schemaPath = path.join(root, "prisma", "schema.prisma");
+const schemaDir = path.dirname(schemaPath);
+
+function requireDatabaseUrl(): void {
+  if (!process.env.DATABASE_URL?.trim()) {
+    console.error(
+      "[ensureSchema] В окружении нет DATABASE_URL. Задайте в Pterodactyl, например: file:./database.sqlite3"
+    );
+    process.exit(1);
+  }
+}
+
+/** Относительные SQLite-пути — относительно папки со schema.prisma (не cwd контейнера). */
+function normalizeSqliteDatabaseUrl(): void {
+  const url = process.env.DATABASE_URL!;
+  if (!url.startsWith("file:")) {
+    return;
+  }
+
+  let filePath = url.slice("file:".length).trim();
+  // file:///absolute (редко в контейнере)
+  if (filePath.startsWith("//") && filePath.length > 2) {
+    filePath = filePath.replace(/^\/+/, "/");
+  }
+
+  if (path.isAbsolute(filePath)) {
+    ensureSqliteParentDir(filePath);
+    process.env.DATABASE_URL = "file:" + filePath.replace(/\\/g, "/");
+    return;
+  }
+
+  const abs = path.resolve(schemaDir, filePath.replace(/^\.\//, ""));
+  ensureSqliteParentDir(abs);
+  process.env.DATABASE_URL = "file:" + abs.replace(/\\/g, "/");
+  console.log("[ensureSchema] SQLite (абсолютный путь):", abs);
+}
+
+function ensureSqliteParentDir(filePath: string): void {
+  const dir = path.dirname(filePath);
+  fs.mkdirSync(dir, { recursive: true });
+}
+
+function resolvePrismaCli(): string | null {
+  const direct = path.join(root, "node_modules", "prisma", "build", "index.js");
+  if (fs.existsSync(direct)) {
+    return direct;
+  }
+  try {
+    const req = createRequire(path.join(root, "package.json"));
+    return req.resolve("prisma/build/index.js");
+  } catch {
+    return null;
+  }
+}
 
 if (process.env.SKIP_PRISMA_SCHEMA_SYNC === "1") {
-  // пусто — пропуск (отладка)
+  // пропуск
 } else {
   if (!fs.existsSync(schemaPath)) {
     console.error("[ensureSchema] Нет файла prisma/schema.prisma");
     process.exit(1);
   }
+
+  requireDatabaseUrl();
+  normalizeSqliteDatabaseUrl();
 
   const pushArgs = ["db", "push", "--skip-generate", "--schema", schemaPath];
 
@@ -31,10 +89,10 @@ if (process.env.SKIP_PRISMA_SCHEMA_SYNC === "1") {
       shell,
     });
 
-  const prismaCli = path.join(root, "node_modules", "prisma", "build", "index.js");
+  const prismaCli = resolvePrismaCli();
 
   let result: ReturnType<typeof spawnSync> | null = null;
-  if (fs.existsSync(prismaCli)) {
+  if (prismaCli) {
     result = run(process.execPath, [prismaCli, ...pushArgs], false);
   }
 
